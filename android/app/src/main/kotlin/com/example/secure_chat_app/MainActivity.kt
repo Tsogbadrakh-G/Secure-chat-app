@@ -1,4 +1,4 @@
-package com.example.secure_chat_app
+package com.example.secure_chat
 
 import io.flutter.embedding.android.FlutterActivity
 
