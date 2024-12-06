@@ -21,6 +21,8 @@ dependencies:
   dio: ^5.7.0
   random_string: ^2.3.1
   intl: ^0.20.1
+  flutter_hooks: ^0.20.5
+  hooks_riverpod: ^2.6.1
 
 dev_dependencies:
   flutter_test:

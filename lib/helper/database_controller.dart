@@ -17,8 +17,14 @@ class DatabaseController {
     return await FirebaseFirestore.instance.collection("users").where("E-mail", isEqualTo: email).get();
   }
 
-  static Future<QuerySnapshot> search(String username) async {
-    return await FirebaseFirestore.instance.collection("users").where("SearchKey", isEqualTo: username.substring(0, 1).toUpperCase()).get();
+  static Future<List<Map<String, dynamic>>> search(String username) async {
+    List<Map<String, dynamic>> users = [];
+    final snapshot = await FirebaseFirestore.instance.collection("users").get();
+    for (var doc in snapshot.docs) {
+      if ((doc.data()['username'] as String).contains(username)) users.add(doc.data());
+    }
+
+    return users;
   }
 
   static createChatRoom(String chatRoomId, Map<String, dynamic> chatRoomInfoMap) async {

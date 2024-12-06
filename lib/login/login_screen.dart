@@ -59,10 +59,15 @@ class _LogInState extends ConsumerState<LogInScreen> {
     try {
       email = email.toLowerCase();
       await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
+      final regex = RegExp(r'^([^@]+)@');
+      final match = regex.firstMatch(userController.email);
+      String username = '';
+      if (match != null) {
+        username = match.group(1)!; // Extracts 'test'
+      }
+      userController.saveUser(email, username);
 
-      userController.saveUser(email);
-
-      Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen()));
+      Navigator.push(context, MaterialPageRoute(builder: (context) => const HomeScreen()));
       FirebaseUtils.main();
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {

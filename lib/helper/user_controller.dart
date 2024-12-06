@@ -41,8 +41,9 @@ class UserController extends GetxController {
     roomsNum.value = len;
   }
 
-  void saveUser(String email) {
+  void saveUser(String email, String username) {
     this.email = email;
+    this.myUserName = username;
   }
 
   void setLastMessage(String chatroomId, Map<String, dynamic> lasMessageMap, bool read, String myUserName, String username) {
