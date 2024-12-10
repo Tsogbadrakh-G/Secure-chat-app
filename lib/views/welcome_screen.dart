@@ -11,6 +11,11 @@ class WelcomeScreen extends ConsumerStatefulWidget {
 
 class _WelcomeScreen extends ConsumerState<WelcomeScreen> {
   @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       color: Colors.white,

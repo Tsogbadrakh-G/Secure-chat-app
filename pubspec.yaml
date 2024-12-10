@@ -23,6 +23,8 @@ dependencies:
   intl: ^0.20.1
   flutter_hooks: ^0.20.5
   hooks_riverpod: ^2.6.1
+  web_socket_channel: ^3.0.1
+  cached_network_image: ^3.4.1
 
 dev_dependencies:
   flutter_test:

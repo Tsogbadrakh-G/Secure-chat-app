@@ -9,12 +9,10 @@ class UserController extends GetxController {
   final dio = Dio();
 
   //Тухайн аппын нэвтэрсний дараа хэрэглэгчийн мэдээллийг хадгалах хувьсагчууд
-  String id = '', myName = '', myUserName = '', key = '', email = '';
-  Rx<String> picUrl = ''.obs;
+  String id = '', myUserName = '', key = '', email = '';
+
   List<String> nativeLans = List.empty(growable: true);
 
-  // Тухайн хэрэглэгчийн нийт уншаагүй чатын тоог хадгалах хувьсагч
-  RxInt unreadChats = 0.obs;
   final firestoreInstance = FirebaseFirestore.instance;
 
   //Listener-д бүртгэгдсэн чат өрөөнүүдийн утгыг хадгалах хувьсагч
@@ -43,7 +41,7 @@ class UserController extends GetxController {
 
   void saveUser(String email, String username) {
     this.email = email;
-    this.myUserName = username;
+    myUserName = username;
   }
 
   void setLastMessage(String chatroomId, Map<String, dynamic> lasMessageMap, bool read, String myUserName, String username) {
@@ -77,7 +75,6 @@ class UserController extends GetxController {
         "sendBy": myUserName,
         "ts": now,
         "time": FieldValue.serverTimestamp(),
-        "imgUrl": picUrl.value,
       };
 
       DocumentSnapshot ds = await FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).get();
@@ -100,7 +97,6 @@ class UserController extends GetxController {
           "read": false,
           "to_msg_$myUserName": 0,
           "to_msg_$ousername": to,
-          "sendByNameFrom": myName,
           "sendByNameTo": oname
         };
         DatabaseController.updateLastMessageSend(chatRoomId, lastMessageInfoMap);
@@ -149,5 +145,13 @@ class UserController extends GetxController {
       data: formData,
       options: Options(headers: {"Content-Type": "multipart/form-data"}),
     );
+  }
+
+  getChatRoomIdbyUsername(String a, String b) {
+    if (a.substring(0, 1).codeUnitAt(0) > b.substring(0, 1).codeUnitAt(0)) {
+      return "${b}_$a";
+    } else {
+      return "${a}_$b";
+    }
   }
 }

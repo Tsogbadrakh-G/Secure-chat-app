@@ -1,7 +1,4 @@
-// ignore_for_file: must_be_immutable
-
-import 'dart:developer';
-
+// ignore_for_file: must_be_immutable, use_build_context_synchronously
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +7,8 @@ import 'package:get/get.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:secure_chat_app/helper/database_controller.dart';
 import 'package:secure_chat_app/helper/user_controller.dart';
+import 'package:secure_chat_app/views/channel_screen.dart';
+import 'package:secure_chat_app/views/chat_room.dart';
 
 class HomeScreen extends StatefulHookConsumerWidget {
   const HomeScreen({super.key});
@@ -22,35 +21,28 @@ class _HomeScreen extends ConsumerState<HomeScreen> {
   UserController userController = Get.find<UserController>();
   TextEditingController textEditingController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-
   final tempSearchStore = StateProvider<List<Map<String, dynamic>>>((ref) => []);
+  StateProvider<QuerySnapshot?> snapshot = StateProvider((ref) => null);
   final isFocused = StateProvider<bool>((ref) => false);
+  String avatarUrl =
+      "https://firebasestorage.googleapis.com/v0/b/language-exchange-app-cf264.appspot.com/o/images%2Fimg_profile.png?alt=media&token=82d48d53-f2d7-4c3c-8daa-930ce1253b72&_gl=1*1c3e9ai*_ga*MTAwMzU1OTkzMi4xNjc4OTc2OTE3*_ga_CW55HF8NVT*MTY5ODQ1ODE1OS41MC4xLjE2OTg0NjM0MTEuMjAuMC4w";
+
   saveUser() async {
-    final regex = RegExp(r'^([^@]+)@');
-    final match = regex.firstMatch(userController.email);
-    String username = '';
-    if (match != null) {
-      username = match.group(1)!; // Extracts 'test'
-    }
-    Map<String, dynamic> userInfoMap = {
-      "Photo":
-          "https://firebasestorage.googleapis.com/v0/b/language-exchange-app-cf264.appspot.com/o/images%2Fimg_profile.png?alt=media&token=82d48d53-f2d7-4c3c-8daa-930ce1253b72&_gl=1*1c3e9ai*_ga*MTAwMzU1OTkzMi4xNjc4OTc2OTE3*_ga_CW55HF8NVT*MTY5ODQ1ODE1OS41MC4xLjE2OTg0NjM0MTEuMjAuMC4w",
-      "email": userController.email,
-      'username': username
-    };
+    int atIndex = userController.email.indexOf('@');
+    String username = userController.email.substring(0, atIndex);
+    Map<String, dynamic> userInfoMap = {"Photo": avatarUrl, "email": userController.email, 'username': username};
     final user = FirebaseAuth.instance.currentUser;
     String? ui = user?.uid;
 
     await FirebaseFirestore.instance.collection("users").doc(ui).set(userInfoMap);
 
-    final usrs = await FirebaseFirestore.instance.collection("users");
+    //final usrs = await FirebaseFirestore.instance.collection("users");
   }
 
   @override
   void initState() {
     saveUser();
     _focusNode.addListener(() {
-      log('focus: ${_focusNode.hasFocus}');
       if (_focusNode.hasFocus) {
         ref.read(isFocused.notifier).state = true;
       } else {
@@ -62,28 +54,27 @@ class _HomeScreen extends ConsumerState<HomeScreen> {
   }
 
   initiateSearch(String value) {
-    log('value: $value');
     if (value.isEmpty) {
       ref.read(tempSearchStore.notifier).state = [];
       return;
     }
     DatabaseController.search(value).then((List<Map<String, dynamic>> usrs) {
       ref.read(tempSearchStore.notifier).state = usrs;
-
-      log('tempSearchStore: ${ref.read(tempSearchStore)}');
     });
-  }
-
-  getChatRoomIdbyUsername(String a, String b) {
-    if (a.substring(0, 1).codeUnitAt(0) > b.substring(0, 1).codeUnitAt(0)) {
-      return "${b}_$a";
-    } else {
-      return "${a}_$b";
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final roomSnapshot = ref.watch(snapshot);
+    useEffect(() {
+      Future<void> fetch() async {
+        ref.read(snapshot.notifier).state = await FirebaseFirestore.instance.collection("chatrooms").get();
+      }
+
+      fetch();
+      return null;
+    }, []);
+
     final users = ref.watch(tempSearchStore);
     final focused = ref.watch(isFocused);
     final onchange = useState(false);
@@ -134,11 +125,13 @@ class _HomeScreen extends ConsumerState<HomeScreen> {
                               Icons.search,
                               color: Color(0Xff2675EC),
                             ),
-                      onPressed: () {
+                      onPressed: () async {
                         if (focused) {
                           _focusNode.unfocus();
                           textEditingController.clear();
                           ref.read(tempSearchStore.notifier).state = [];
+
+                          ref.read(snapshot.notifier).state = await FirebaseFirestore.instance.collection("chatrooms").get();
                         } else {
                           _focusNode.requestFocus();
                         }
@@ -147,9 +140,7 @@ class _HomeScreen extends ConsumerState<HomeScreen> {
                     border: const OutlineInputBorder(borderSide: BorderSide.none),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(15.0),
-                      borderSide: const BorderSide(
-                        color: Color.fromARGB(255, 205, 205, 206),
-                      ),
+                      borderSide: const BorderSide(color: Color.fromARGB(255, 205, 205, 206)),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(15.0),
@@ -163,7 +154,6 @@ class _HomeScreen extends ConsumerState<HomeScreen> {
                       fontSize: 18,
                       fontWeight: FontWeight.w400,
                       color: const Color(0xff3c3c43).withOpacity(0.5),
-                      //height: 22 / 17,
                     ),
                   ),
                   style: const TextStyle(
@@ -171,73 +161,38 @@ class _HomeScreen extends ConsumerState<HomeScreen> {
                 ),
               ),
             ),
-            if (focused) ...[
+            if (focused && users.isNotEmpty) ...[
               SliverPadding(
                 padding: const EdgeInsets.only(top: 5),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (BuildContext context, int index) {
-                      // Build the list of items
-
                       return ListView(
                           padding: const EdgeInsets.only(left: 5.0, right: 5.0),
                           primary: false,
                           shrinkWrap: true,
                           children: ref.read(tempSearchStore).map((element) {
                             return InkWell(
-                              onTap: () async {
-                                log('username: ${userController.myUserName}, oth usrname: ${element["username"]}');
-                                String chatRoomId = getChatRoomIdbyUsername(userController.myUserName, element["username"]);
-                                final snapshot = await FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).get();
-                                if (!snapshot.exists) {
-                                  return FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).set({'test': 'test'});
-                                }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 20),
-                                margin: const EdgeInsets.symmetric(vertical: 8),
-                                child: Material(
-                                  elevation: 5.0,
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-                                    child: Row(
-                                      children: [
-                                        ClipRRect(
-                                            borderRadius: BorderRadius.circular(30),
-                                            child: Image.network(
-                                              element["Photo"],
-                                              height: 60,
-                                              width: 60,
-                                              fit: BoxFit.cover,
-                                            )),
-                                        const SizedBox(
-                                          width: 20.0,
-                                        ),
-                                        Text(
-                                          element["username"],
-                                          style: const TextStyle(
-                                              color: Color(0xff434347), fontWeight: FontWeight.w500, fontFamily: 'Nunito', fontSize: 18.0),
-                                        )
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                            //return _helperController.buildResultCard(element, search);
+                                onTap: () async {
+                                  String chatRoomId = userController.getChatRoomIdbyUsername(userController.myUserName, element["username"]);
+                                  final snapshot = await FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).get();
+                                  if (!snapshot.exists) {
+                                    return FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).set({'test': 'test'});
+                                  }
+                                  await Navigator.push(context,
+                                      MaterialPageRoute(builder: (context) => ChannelScreen(name: element["username"], imageUrl: element["Photo"])));
+                                },
+                                child: ChatRoomCard(photoUrl: element['Photo'], username: element['username']));
                           }).toList());
                     },
                     childCount: 1, // Number of items in the list
                   ),
                 ),
               )
-            ] else if (users.isEmpty) ...[
+            ] else if (focused && users.isEmpty) ...[
               SliverToBoxAdapter(
                 child: SizedBox(
                     height: MediaQuery.sizeOf(context).height * 2 / 3,
-                    // decoration: BoxDecoration(border: Border.all()),
                     child: const Center(
                         child: Text(
                       'No item',
@@ -245,24 +200,44 @@ class _HomeScreen extends ConsumerState<HomeScreen> {
                     ))),
               )
             ] else ...[
-              SliverPadding(
-                padding: const EdgeInsets.only(top: 5),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (BuildContext context, int index) {
-                      // Build the list of items
-                      return Text('chatroom sample');
-                      // return chatRoomList();
-                    },
-                    childCount: 1, // Number of items in the list
-                  ),
-                ),
-              )
+              roomSnapshot == null
+                  ? SliverToBoxAdapter(
+                      child: SizedBox(
+                          height: MediaQuery.sizeOf(context).height * 2 / 3,
+                          child: const Center(
+                              child: Text(
+                            'No item',
+                            style: TextStyle(fontFamily: 'Nunito'),
+                          ))),
+                    )
+                  : SliverPadding(
+                      padding: const EdgeInsets.only(top: 5),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (BuildContext context, int index) {
+                            return ListView.builder(
+                                padding: EdgeInsets.zero,
+                                itemCount: roomSnapshot.docs.length,
+                                shrinkWrap: true,
+                                physics: const ClampingScrollPhysics(),
+                                itemBuilder: (context, index) {
+                                  DocumentSnapshot ds = roomSnapshot.docs[index];
+
+                                  String username = ds.id.replaceAll("_", "").replaceAll(userController.myUserName, "");
+
+                                  return InkWell(
+                                    onTap: () => Navigator.push(
+                                        context, MaterialPageRoute(builder: (context) => ChannelScreen(name: username, imageUrl: avatarUrl))),
+                                    child: ChatRoomCard(photoUrl: avatarUrl, username: username),
+                                  );
+                                });
+                          },
+                          childCount: 1, // Number of items in the list
+                        ),
+                      ),
+                    )
             ]
           ],
-        )
-
-        //const Center(child: Text('Welcome to Secure Chat App!')),
-        );
+        ));
   }
 }

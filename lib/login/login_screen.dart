@@ -55,16 +55,14 @@ class _LogInState extends ConsumerState<LogInScreen> {
     }
   }
 
-  userLogin() async {
+  login() async {
     try {
       email = email.toLowerCase();
       await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
-      final regex = RegExp(r'^([^@]+)@');
-      final match = regex.firstMatch(userController.email);
-      String username = '';
-      if (match != null) {
-        username = match.group(1)!; // Extracts 'test'
-      }
+
+      int atIndex = email.indexOf('@');
+      String username = email.substring(0, atIndex);
+
       userController.saveUser(email, username);
 
       Navigator.push(context, MaterialPageRoute(builder: (context) => const HomeScreen()));
@@ -214,7 +212,7 @@ class _LogInState extends ConsumerState<LogInScreen> {
                                   password = userpasswordcontroller.text;
                                 });
                               }
-                              userLogin();
+                              login();
                             }
                           },
                           style: ElevatedButton.styleFrom(
