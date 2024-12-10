@@ -1,5 +1,6 @@
 import 'dart:developer';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -89,7 +90,7 @@ class _ChatPageState extends ConsumerState<ChannelScreen> {
                       suffixIcon: GestureDetector(
                           onTap: () {
                             log('send message');
-
+                            FirebaseMessaging.instance.sendMessage();
                             channel.sink.add("${userController.myUserName}: ${messagecontroller.text}");
                           },
                           child: const Icon(
