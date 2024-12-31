@@ -1,8 +1,6 @@
 import 'dart:developer';
 
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:secure_chat_app/helper/user_controller.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -10,38 +8,32 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 class ChannelScreen extends ConsumerStatefulWidget {
   final String name;
   final String? imageUrl;
+  final String chatRoomId;
   const ChannelScreen({
     super.key,
     required this.name,
     this.imageUrl,
+    required this.chatRoomId,
   });
 
   @override
   ConsumerState<ChannelScreen> createState() => _ChatPageState();
 }
 
-class Message {
-  String message;
-  String senderName;
-  Message({required this.message, required this.senderName});
-}
-
 class _ChatPageState extends ConsumerState<ChannelScreen> {
-  final userController = Get.find<UserController>();
   TextEditingController messagecontroller = TextEditingController();
   List<Message> messages = [];
+  final channel = WebSocketChannel.connect(Uri.parse('ws://192.168.4.28:3001'));
+  String? usrFcm;
 
-  String key = '';
-  final channel = WebSocketChannel.connect(
-    Uri.parse('ws://192.168.4.28:3000'),
-  );
-
-  StreamBuilder? streamBuilder;
   @override
   void initState() {
-    //  s
-
+    getFCM();
     super.initState();
+  }
+
+  getFCM() async {
+    usrFcm = await ref.read(userController.notifier).fetchThisUserFCM(widget.chatRoomId);
   }
 
   @override
@@ -63,11 +55,9 @@ class _ChatPageState extends ConsumerState<ChannelScreen> {
                   itemCount: messages.length,
                   itemBuilder: (context, index) => chatMessageTile(
                     messages[index].message,
-                    messages[index].senderName == userController.myUserName,
+                    messages[index].senderName == ref.read(userController).myUserName,
                   ),
                 );
-
-                // return const SizedBox.shrink();
               }
               return const Text('');
             },
@@ -90,12 +80,16 @@ class _ChatPageState extends ConsumerState<ChannelScreen> {
                       suffixIcon: GestureDetector(
                           onTap: () {
                             log('send message');
-                            FirebaseMessaging.instance.sendMessage();
-                            channel.sink.add("${userController.myUserName}: ${messagecontroller.text}");
+
+                            dio.get('http://192.168.4.28:3000/', data: {
+                              'fcm': usrFcm,
+                              'message': messagecontroller.text,
+                              'sender_username': ref.read(userController).myUserName,
+                            });
+
+                            channel.sink.add("${ref.read(userController).myUserName}: ${messagecontroller.text}");
                           },
-                          child: const Icon(
-                            Icons.send_rounded,
-                          ))),
+                          child: const Icon(Icons.send_rounded))),
                 ),
               ),
             ),
@@ -185,4 +179,10 @@ class _ChatPageState extends ConsumerState<ChannelScreen> {
   void dispose() {
     super.dispose();
   }
+}
+
+class Message {
+  String message;
+  String senderName;
+  Message({required this.message, required this.senderName});
 }

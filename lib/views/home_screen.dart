@@ -1,14 +1,13 @@
 // ignore_for_file: must_be_immutable, use_build_context_synchronously
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:get/get.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:secure_chat_app/helper/database_controller.dart';
-import 'package:secure_chat_app/helper/user_controller.dart';
-import 'package:secure_chat_app/views/channel_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secure_chat_app/views/chat_room.dart';
+import 'package:secure_chat_app/views/channel_screen.dart';
+import 'package:secure_chat_app/helper/user_controller.dart';
+import 'package:secure_chat_app/helper/database_controller.dart';
 
 class HomeScreen extends StatefulHookConsumerWidget {
   const HomeScreen({super.key});
@@ -18,7 +17,6 @@ class HomeScreen extends StatefulHookConsumerWidget {
 }
 
 class _HomeScreen extends ConsumerState<HomeScreen> {
-  UserController userController = Get.find<UserController>();
   TextEditingController textEditingController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   final tempSearchStore = StateProvider<List<Map<String, dynamic>>>((ref) => []);
@@ -27,21 +25,19 @@ class _HomeScreen extends ConsumerState<HomeScreen> {
   String avatarUrl =
       "https://firebasestorage.googleapis.com/v0/b/language-exchange-app-cf264.appspot.com/o/images%2Fimg_profile.png?alt=media&token=82d48d53-f2d7-4c3c-8daa-930ce1253b72&_gl=1*1c3e9ai*_ga*MTAwMzU1OTkzMi4xNjc4OTc2OTE3*_ga_CW55HF8NVT*MTY5ODQ1ODE1OS41MC4xLjE2OTg0NjM0MTEuMjAuMC4w";
 
-  saveUser() async {
-    int atIndex = userController.email.indexOf('@');
-    String username = userController.email.substring(0, atIndex);
-    Map<String, dynamic> userInfoMap = {"Photo": avatarUrl, "email": userController.email, 'username': username};
-    final user = FirebaseAuth.instance.currentUser;
-    String? ui = user?.uid;
-
-    await FirebaseFirestore.instance.collection("users").doc(ui).set(userInfoMap);
-
-    //final usrs = await FirebaseFirestore.instance.collection("users");
-  }
-
   @override
   void initState() {
-    saveUser();
+    int atIndex = ref.read(userController).email.indexOf('@');
+    String username = ref.read(userController).email.substring(0, atIndex);
+    Map<String, dynamic> userInfoMap = {
+      "Photo": avatarUrl,
+      "email": ref.read(userController).email,
+      'username': username,
+    };
+    final user = FirebaseAuth.instance.currentUser;
+    String? ui = user?.uid;
+    ref.read(userController.notifier).saveUserInfoToCloud(userInfoMap, ui ?? '');
+
     _focusNode.addListener(() {
       if (_focusNode.hasFocus) {
         ref.read(isFocused.notifier).state = true;
@@ -173,19 +169,31 @@ class _HomeScreen extends ConsumerState<HomeScreen> {
                           shrinkWrap: true,
                           children: ref.read(tempSearchStore).map((element) {
                             return InkWell(
-                                onTap: () async {
-                                  String chatRoomId = userController.getChatRoomIdbyUsername(userController.myUserName, element["username"]);
-                                  final snapshot = await FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).get();
-                                  if (!snapshot.exists) {
-                                    return FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).set({'test': 'test'});
-                                  }
-                                  await Navigator.push(context,
-                                      MaterialPageRoute(builder: (context) => ChannelScreen(name: element["username"], imageUrl: element["Photo"])));
-                                },
-                                child: ChatRoomCard(photoUrl: element['Photo'], username: element['username']));
+                              onTap: () async {
+                                String chatRoomId = ref
+                                    .read(userController.notifier)
+                                    .getChatRoomIdbyUsername(ref.read(userController).myUserName, element["username"]);
+                                final snapshot = await FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).get();
+                                if (!snapshot.exists) {
+                                  return FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).set({'test': 'test'});
+                                }
+                                await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (context) => ChannelScreen(
+                                              name: element["username"],
+                                              imageUrl: element["Photo"],
+                                              chatRoomId: chatRoomId,
+                                            )));
+                              },
+                              child: ChatRoomCard(
+                                photoUrl: element['Photo'],
+                                username: element['username'],
+                              ),
+                            );
                           }).toList());
                     },
-                    childCount: 1, // Number of items in the list
+                    childCount: 1,
                   ),
                 ),
               )
@@ -201,15 +209,11 @@ class _HomeScreen extends ConsumerState<HomeScreen> {
               )
             ] else ...[
               roomSnapshot == null
-                  ? SliverToBoxAdapter(
-                      child: SizedBox(
-                          height: MediaQuery.sizeOf(context).height * 2 / 3,
-                          child: const Center(
-                              child: Text(
-                            'No item',
-                            style: TextStyle(fontFamily: 'Nunito'),
-                          ))),
-                    )
+                  ? const SliverToBoxAdapter(
+                      child: Center(
+                      child: Text('Loading...'),
+                      //CircularProgressIndicator()
+                    ))
                   : SliverPadding(
                       padding: const EdgeInsets.only(top: 5),
                       sliver: SliverList(
@@ -223,11 +227,17 @@ class _HomeScreen extends ConsumerState<HomeScreen> {
                                 itemBuilder: (context, index) {
                                   DocumentSnapshot ds = roomSnapshot.docs[index];
 
-                                  String username = ds.id.replaceAll("_", "").replaceAll(userController.myUserName, "");
+                                  String username = ds.id.replaceAll("_", "").replaceAll(ref.read(userController).myUserName, "");
 
                                   return InkWell(
                                     onTap: () => Navigator.push(
-                                        context, MaterialPageRoute(builder: (context) => ChannelScreen(name: username, imageUrl: avatarUrl))),
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (context) => ChannelScreen(
+                                                  name: username,
+                                                  imageUrl: avatarUrl,
+                                                  chatRoomId: ds.id,
+                                                ))),
                                     child: ChatRoomCard(photoUrl: avatarUrl, username: username),
                                   );
                                 });

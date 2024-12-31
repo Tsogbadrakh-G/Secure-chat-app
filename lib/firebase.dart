@@ -1,17 +1,14 @@
 import 'dart:developer';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:get/get.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secure_chat_app/helper/user_controller.dart';
 
 import 'firebase_options.dart';
-// import '../models/token/token.dart';
-// import '../service/locator.dart';
-// import '../service/navigation.dart';
-// import '../service/dialog.dart';
 
 late AndroidNotificationChannel channel;
 late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
@@ -21,26 +18,22 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   FirebaseUtils.onFirebaseBackgroundMsg(message);
 }
 
-UserController _dataController = Get.find();
-
-abstract class FirebaseUtils {
-  static main() async {
-    await Firebase.initializeApp(name: "Language Exchange Platform", options: DefaultFirebaseOptions.currentPlatform);
+class FirebaseUtils {
+  static AndroidInitializationSettings initializationSettingsAndroid = const AndroidInitializationSettings('@mipmap/ic_launcher');
+  static FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  static init(WidgetRef ref) async {
+    await Firebase.initializeApp(name: "Chat app secure", options: DefaultFirebaseOptions.currentPlatform);
     // Initialization section
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-
-    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const DarwinInitializationSettings initializationSettingsIOS = DarwinInitializationSettings();
-    const InitializationSettings initializationSettings =
-        InitializationSettings(android: initializationSettingsAndroid, iOS: initializationSettingsIOS);
-
+    DarwinInitializationSettings initializationSettingsIOS = const DarwinInitializationSettings();
+    InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid, iOS: initializationSettingsIOS);
     await flutterLocalNotificationsPlugin.initialize(initializationSettings,
         onDidReceiveNotificationResponse: onDidReceiveLocalNotification,
         onDidReceiveBackgroundNotificationResponse: onDidReceiveBackgroundNotificationResponse);
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
+
     // ?.requestPermission();
     // Initialization section end
 
@@ -52,23 +45,12 @@ abstract class FirebaseUtils {
     debugPrint('User granted permission: ${settings.authorizationStatus}');
 
     try {
-      // final box = Hive.box(hiveBoxName);
-      var fcmToken = await FirebaseMessaging.instance.getToken();
-      _dataController.fcmToken = fcmToken ?? 'empty';
-      _dataController.updateUserFCMtoken();
-      log('my token: $fcmToken');
-      // FirebaseMessaging.instance
-      //     .sendMessage(to: fcmToken, data: {'message': 'mnessage'});
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+      final user = FirebaseAuth.instance.currentUser;
+      String? uid1 = user?.uid;
+      ref.read(userController.notifier).updateUserFCMtoken(uid1 ?? '', {'fcm_token': fcmToken ?? 'empty'});
 
-      // Token? token = box.get('token') as Token?;
-      // if (fcmToken != null) {
-      //   if (token != null) {
-      //     token.fcmToken = fcmToken;
-      //     await box.put('token', token);
-      //   } else {
-      //     await box.put('token', Token(fcmToken: fcmToken));
-      //   }
-      // }
+      log('my token: $fcmToken');
 
       log("********************FIREBASE MESSAGE TOKEN******************");
       log(fcmToken.toString());
@@ -120,9 +102,6 @@ abstract class FirebaseUtils {
   }
 
   static void onFirebaseBackgroundMsg(RemoteMessage message) async {
-    // final box = Hive.box(hiveBoxName);
-    // final lang = await box.get('lang');
-
     RemoteNotification? notification = message.notification;
 
     log('onFirebaseBackgroundMsg ${message.messageId}');

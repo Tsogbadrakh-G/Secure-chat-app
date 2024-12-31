@@ -1,126 +1,59 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:get/get.dart' hide FormData;
-import 'package:intl/intl.dart';
-import 'package:random_string/random_string.dart';
+import 'dart:developer';
+
 import 'package:dio/dio.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secure_chat_app/helper/database_controller.dart';
 
-class UserController extends GetxController {
-  final dio = Dio();
+final dio = Dio();
+final userController = StateNotifierProvider<UserController, UserState>((ref) => UserController());
 
-  //Тухайн аппын нэвтэрсний дараа хэрэглэгчийн мэдээллийг хадгалах хувьсагчууд
-  String id = '', myUserName = '', key = '', email = '';
+class UserState {
+  final String usrId;
+  final String myUserName;
+  final String email;
+  const UserState(
+    this.usrId,
+    this.myUserName,
+    this.email,
+  );
 
-  List<String> nativeLans = List.empty(growable: true);
+  UserState copyWith({
+    final usrId,
+    final myUserName,
+    final email,
+  }) {
+    return UserState(
+      usrId ?? this.usrId,
+      myUserName ?? this.myUserName,
+      email ?? this.email,
+    );
+  }
+}
 
-  final firestoreInstance = FirebaseFirestore.instance;
+class UserController extends StateNotifier<UserState> {
+  UserController() : super(const UserState('', '', ''));
 
-  //Listener-д бүртгэгдсэн чат өрөөнүүдийн утгыг хадгалах хувьсагч
-  List<String> activeChatroomListeners = [];
-
-  //хэрэглэгчийн үүсгэсэн өрөөнүүдийн тоо
-  RxInt roomsNum = 0.obs;
-
-  // хэрэглэгчийн төрөлх хэлийг хадгалах хувьсагч
-  String myNativeLan = '';
-
-  String fcmToken = '';
-
-  // ignore: non_constant_identifier_names
-  Future<void> chatroomsLength() async {
-    int len = 0;
-    QuerySnapshot querySnapshot = await firestoreInstance.collection('chatrooms').get();
-
-    for (QueryDocumentSnapshot doc in querySnapshot.docs) {
-      String username = doc.id.replaceAll(myUserName, "");
-      username = username.replaceAll("_", "");
-      len++;
-    }
-    roomsNum.value = len;
+  Future<void> saveUserInfoToCloud(Map<String, dynamic> json, String uid) async {
+    await FirebaseFirestore.instance.collection("users").doc(uid).set(json);
   }
 
   void saveUser(String email, String username) {
-    this.email = email;
-    myUserName = username;
+    state = state.copyWith(myUserName: username, email: email);
   }
 
-  void setLastMessage(String chatroomId, Map<String, dynamic> lasMessageMap, bool read, String myUserName, String username) {
-    Map<String, dynamic> lastMessageInfoMap = {
-      "lastMessage": lasMessageMap['lastMessage'],
-      "lastMessageSendTs": lasMessageMap['lastMessageSendTs'],
-      "time": lasMessageMap['time'],
-      "lastMessageSendBy": lasMessageMap['lastMessageSendBy'],
-      "read": read,
-      "to_msg_$myUserName": 0,
-      "to_msg_$username": lasMessageMap['to_msg_$username']
-    };
-
-    DatabaseController.updateLastMessageSend(chatroomId, lastMessageInfoMap);
-  }
-
-  addMessage(String chatRoomId, String text, String from, String transto, String ousername, String oname) async {
-    if (text != "") {
-      String message = text;
-      text = "";
-
-      String messageId = randomAlphaNumeric(10);
-
-      DateTime now = DateTime.now();
-      String formattedDate = DateFormat('h:mma').format(now);
-
-      Map<String, dynamic> messageInfoMap = {
-        "id": messageId,
-        "type": "text",
-        "message": message,
-        "sendBy": myUserName,
-        "ts": now,
-        "time": FieldValue.serverTimestamp(),
-      };
-
-      DocumentSnapshot ds = await FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).get();
-      Map<String, dynamic>? lastMessageData = ds.data() as Map<String, dynamic>;
-
-      int to = 0;
-
-      if (lastMessageData["lastMessage"] is String) {
-        to = lastMessageData['to_msg_$ousername'] + 1;
-      } else {
-        to = 1;
-      }
-
-      DatabaseController.addMessage(chatRoomId, messageId, messageInfoMap).then((value) {
-        Map<String, dynamic> lastMessageInfoMap = {
-          "lastMessage": message,
-          "lastMessageSendTs": formattedDate,
-          "time": FieldValue.serverTimestamp(),
-          "lastMessageSendBy": myUserName,
-          "read": false,
-          "to_msg_$myUserName": 0,
-          "to_msg_$ousername": to,
-          "sendByNameTo": oname
-        };
-        DatabaseController.updateLastMessageSend(chatRoomId, lastMessageInfoMap);
-      });
-
-      ///!!! required below rows
-
-      //String fcmUser = await fetchthisUserFCM(ousername, chatRoomId);
-
-      //Data.sendNotifcation(fcmUser, myUserName, message);
-    }
-  }
-
-  Future<void> updateUserFCMtoken() async {
+  Future<void> updateUserFCMtoken(String uid, Map<String, dynamic> json) async {
     final CollectionReference usersCollection = FirebaseFirestore.instance.collection('users');
-
-    await usersCollection.doc(id).update({'fcm_$myUserName': fcmToken});
+    await usersCollection.doc(uid).update(json);
   }
 
-  fetchthisUserFCM(String ousername, String chatroomID) async {
-    ousername = chatroomID.replaceAll("_", "").replaceAll(myUserName, "");
-    QuerySnapshot querySnapshot = await DatabaseController.getUserInfo(ousername.toUpperCase());
+  Future<String> fetchThisUserFCM(String chatroomID) async {
+    String username = chatroomID.replaceAll("_", "").replaceAll(state.myUserName, "");
+    QuerySnapshot querySnapshot = await DatabaseController.getUserInfo(username);
     final user = querySnapshot.docs[0].data() as Map<String, dynamic>;
-    String fcm = "${user["fcm_$ousername"]}";
+    String fcm = "${user["fcm_token"]}";
+
+    log('fcm: $fcm');
 
     return fcm;
   }

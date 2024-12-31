@@ -5,7 +5,6 @@ import 'dart:developer';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:get/get.dart';
 import 'package:email_validator/email_validator.dart';
 import 'package:secure_chat_app/firebase.dart';
 import 'package:secure_chat_app/helper/alert.dart';
@@ -25,7 +24,7 @@ class _LogInState extends ConsumerState<LogInScreen> {
   TextEditingController userpasswordcontroller = TextEditingController();
   FocusNode focusNode1 = FocusNode();
   FocusNode focusNode2 = FocusNode();
-  final UserController userController = Get.put(UserController());
+
   bool _isEmptyMail = false;
   bool _isEmptyPass = false;
   bool isValidMail = false;
@@ -63,10 +62,10 @@ class _LogInState extends ConsumerState<LogInScreen> {
       int atIndex = email.indexOf('@');
       String username = email.substring(0, atIndex);
 
-      userController.saveUser(email, username);
+      ref.read(userController.notifier).saveUser(email, username);
 
       Navigator.push(context, MaterialPageRoute(builder: (context) => const HomeScreen()));
-      FirebaseUtils.main();
+      FirebaseUtils.init(ref);
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {
         Alerts.showMyDialog(context, 'There are no registered users you have entered!');
