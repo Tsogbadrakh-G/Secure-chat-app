@@ -1,7 +1,6 @@
 // ignore_for_file: must_be_immutable, use_build_context_synchronously
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secure_chat_app/views/chat_room.dart';
@@ -16,28 +15,18 @@ class HomeScreen extends StatefulHookConsumerWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreen();
 }
 
+String avatarUrl =
+    "https://firebasestorage.googleapis.com/v0/b/language-exchange-app-cf264.appspot.com/o/images%2Fimg_profile.png?alt=media&token=82d48d53-f2d7-4c3c-8daa-930ce1253b72&_gl=1*1c3e9ai*_ga*MTAwMzU1OTkzMi4xNjc4OTc2OTE3*_ga_CW55HF8NVT*MTY5ODQ1ODE1OS41MC4xLjE2OTg0NjM0MTEuMjAuMC4w";
+
 class _HomeScreen extends ConsumerState<HomeScreen> {
   TextEditingController textEditingController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   final tempSearchStore = StateProvider<List<Map<String, dynamic>>>((ref) => []);
   StateProvider<QuerySnapshot?> snapshot = StateProvider((ref) => null);
   final isFocused = StateProvider<bool>((ref) => false);
-  String avatarUrl =
-      "https://firebasestorage.googleapis.com/v0/b/language-exchange-app-cf264.appspot.com/o/images%2Fimg_profile.png?alt=media&token=82d48d53-f2d7-4c3c-8daa-930ce1253b72&_gl=1*1c3e9ai*_ga*MTAwMzU1OTkzMi4xNjc4OTc2OTE3*_ga_CW55HF8NVT*MTY5ODQ1ODE1OS41MC4xLjE2OTg0NjM0MTEuMjAuMC4w";
 
   @override
   void initState() {
-    int atIndex = ref.read(userController).email.indexOf('@');
-    String username = ref.read(userController).email.substring(0, atIndex);
-    Map<String, dynamic> userInfoMap = {
-      "Photo": avatarUrl,
-      "email": ref.read(userController).email,
-      'username': username,
-    };
-    final user = FirebaseAuth.instance.currentUser;
-    String? ui = user?.uid;
-    ref.read(userController.notifier).saveUserInfoToCloud(userInfoMap, ui ?? '');
-
     _focusNode.addListener(() {
       if (_focusNode.hasFocus) {
         ref.read(isFocused.notifier).state = true;
@@ -175,8 +164,9 @@ class _HomeScreen extends ConsumerState<HomeScreen> {
                                     .getChatRoomIdbyUsername(ref.read(userController).myUserName, element["username"]);
                                 final snapshot = await FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).get();
                                 if (!snapshot.exists) {
-                                  return FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).set({'test': 'test'});
+                                  return FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).set({'id': chatRoomId});
                                 }
+
                                 await Navigator.push(
                                     context,
                                     MaterialPageRoute(

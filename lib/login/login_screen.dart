@@ -65,7 +65,16 @@ class _LogInState extends ConsumerState<LogInScreen> {
       ref.read(userController.notifier).saveUser(email, username);
 
       Navigator.push(context, MaterialPageRoute(builder: (context) => const HomeScreen()));
-      FirebaseUtils.init(ref);
+
+      Map<String, dynamic> userInfoMap = {
+        "Photo": avatarUrl,
+        "email": ref.read(userController).email,
+        'username': username,
+      };
+      final user = FirebaseAuth.instance.currentUser;
+      String? ui = user?.uid;
+      await ref.read(userController.notifier).saveUserInfoToCloud(userInfoMap, ui ?? '');
+      ref.read(firebaseUtils).getUserToken();
     } on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found') {
         Alerts.showMyDialog(context, 'There are no registered users you have entered!');

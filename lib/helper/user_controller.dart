@@ -2,8 +2,12 @@ import 'dart:developer';
 
 import 'package:dio/dio.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secure_chat_app/helper/database_controller.dart';
+import 'package:secure_chat_app/main.dart';
+import 'package:secure_chat_app/views/channel_screen.dart';
+import 'package:secure_chat_app/views/welcome_screen.dart';
 
 final dio = Dio();
 final userController = StateNotifierProvider<UserController, UserState>((ref) => UserController());
@@ -66,18 +70,12 @@ class UserController extends StateNotifier<UserState> {
     return fcm;
   }
 
-  static Future<void> sendNotifcation(String toToken, String name, String content) async {
-    final dio = Dio();
-
-    String localUrl = 'http://13.125.68.71:5000/sendChat';
-
-    FormData formData = FormData.fromMap({'fcm': toToken, 'name': name, 'content': content});
-
-    dio.get(
-      localUrl,
-      data: formData,
-      options: Options(headers: {"Content-Type": "multipart/form-data"}),
-    );
+  Future<void> sendMessage(String receiverFcm, String message) async {
+    dio.post('http://$hostname:3000/', data: {
+      'fcm': receiverFcm,
+      'message': message,
+      'sender_username': state.myUserName,
+    });
   }
 
   getChatRoomIdbyUsername(String a, String b) {
@@ -86,5 +84,66 @@ class UserController extends StateNotifier<UserState> {
     } else {
       return "${a}_$b";
     }
+  }
+
+  routeChatChannel(String username, String message) => navigatorKey.currentState?.push(MaterialPageRoute(
+        builder: (context) => ChannelScreen(
+          name: username,
+          chatRoomId: getChatRoomIdbyUsername(username, state.myUserName),
+          message: message,
+        ),
+      ));
+
+  // static Future<void> sendNotifcation(String toToken, String name, String content) async {
+  //   final dio = Dio();
+
+  //   String localUrl = 'http://13.125.68.71:5000/sendChat';
+
+  //   FormData formData = FormData.fromMap({'fcm': toToken, 'name': name, 'content': content});
+
+  //   dio.get(
+  //     localUrl,
+  //     data: formData,
+  //     options: Options(headers: {"Content-Type": "multipart/form-data"}),
+  //   );
+  // }
+}
+
+class RouteGenerator {
+  static Route<dynamic> generateRoute(RouteSettings settings) {
+    final args = settings.arguments as Map<String, dynamic>?;
+
+    switch (settings.name) {
+      case '/':
+        return MaterialPageRoute(builder: (_) => const WelcomeScreen()); // Replace with your home screen
+      case '/channel':
+        if (args != null) {
+          return MaterialPageRoute(
+            builder: (_) => ChannelScreen(
+              name: args['name'],
+              chatRoomId: args['chatRoomId'],
+              imageUrl: args['imageUrl'],
+              message: args['message'],
+            ),
+          );
+        }
+        return _errorRoute();
+      // Add more cases for other routes
+      default:
+        return _errorRoute();
+    }
+  }
+
+  static Route<dynamic> _errorRoute() {
+    return MaterialPageRoute(builder: (_) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Error'),
+        ),
+        body: const Center(
+          child: Text('ERROR: Route not found'),
+        ),
+      );
+    });
   }
 }
