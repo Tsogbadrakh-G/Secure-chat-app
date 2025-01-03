@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:secure_chat_app/firebase.dart';
+import 'package:secure_chat_app/helper/user_controller.dart';
 import 'package:secure_chat_app/views/welcome_screen.dart';
 import 'firebase_options.dart';
 
@@ -19,6 +20,10 @@ class MainApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.read(firebaseUtils).init();
-    return MaterialApp(navigatorKey: navigatorKey, home: const WelcomeScreen());
+    return MaterialApp(
+      navigatorKey: navigatorKey,
+      onGenerateRoute: RouteGenerator.generateRoute,
+      home: const WelcomeScreen(),
+    );
   }
 }

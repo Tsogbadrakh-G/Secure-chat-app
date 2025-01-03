@@ -2,6 +2,7 @@
 
 import 'dart:developer';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -63,6 +64,11 @@ class _LogInState extends ConsumerState<LogInScreen> {
       String username = email.substring(0, atIndex);
 
       ref.read(userController.notifier).saveUser(email, username);
+      final rooms = await FirebaseFirestore.instance.collection("chatrooms").get();
+      for (var room in rooms.docs) {
+        log('room: ${room.id}');
+        await FirebaseFirestore.instance.collection("chatrooms").doc(room.id).delete();
+      }
 
       Navigator.push(context, MaterialPageRoute(builder: (context) => const HomeScreen()));
 
@@ -73,6 +79,7 @@ class _LogInState extends ConsumerState<LogInScreen> {
       };
       final user = FirebaseAuth.instance.currentUser;
       String? ui = user?.uid;
+
       await ref.read(userController.notifier).saveUserInfoToCloud(userInfoMap, ui ?? '');
       ref.read(firebaseUtils).getUserToken();
     } on FirebaseAuthException catch (e) {

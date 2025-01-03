@@ -28,15 +28,33 @@ class _ChatPageState extends ConsumerState<ChannelScreen> {
   String avatarUrl =
       "https://firebasestorage.googleapis.com/v0/b/language-exchange-app-cf264.appspot.com/o/images%2Fimg_profile.png?alt=media&token=82d48d53-f2d7-4c3c-8daa-930ce1253b72&_gl=1*1c3e9ai*_ga*MTAwMzU1OTkzMi4xNjc4OTc2OTE3*_ga_CW55HF8NVT*MTY5ODQ1ODE1OS41MC4xLjE2OTg0NjM0MTEuMjAuMC4w";
   TextEditingController messagecontroller = TextEditingController();
-  List<Message> messages = [];
+  final ScrollController _scrollController = ScrollController();
   final channel = WebSocketChannel.connect(Uri.parse('ws://$hostname:3001'));
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent + 100,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
 
   @override
   void initState() {
+    log('message: ${widget.message}');
     if (widget.message != null) {
-      messages.add(Message(message: widget.message!, senderName: widget.name));
-      setState(() {});
+      ref.read(userController.notifier).addMessage(
+            widget.chatRoomId,
+            Message(message: widget.message!, senderName: widget.name),
+          );
     }
+    if (ref.read(userController.notifier).messages[widget.chatRoomId] != null) {
+      for (var element in ref.read(userController.notifier).messages[widget.chatRoomId]!) {
+        channel.sink.add("${element.message}: ${element.senderName}");
+      }
+    }
+
     super.initState();
   }
 
@@ -45,6 +63,7 @@ class _ChatPageState extends ConsumerState<ChannelScreen> {
     return FutureBuilder(
         future: ref.read(userController.notifier).fetchThisUserFCM(widget.chatRoomId),
         builder: (context, snapshot) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
           return Scaffold(
             appBar: buildAppBar(),
             backgroundColor: Colors.white,
@@ -57,16 +76,25 @@ class _ChatPageState extends ConsumerState<ChannelScreen> {
                     if (snapshot.hasData && (snapshot.data as String).contains(":")) {
                       String senderName = snapshot.data.split(":")[0];
                       String message = snapshot.data.split(":")[1];
-                      messages = [...messages, Message(message: message, senderName: senderName)];
+
+                      ref.read(userController.notifier).addMessage(
+                            widget.chatRoomId,
+                            Message(message: message, senderName: senderName),
+                          );
+
+                      _scrollToBottom();
+
                       return ListView.builder(
-                        itemCount: messages.length,
+                        controller: _scrollController,
+                        padding: const EdgeInsets.only(bottom: 100),
+                        itemCount: (ref.read(userController.notifier).messages[widget.chatRoomId] ?? []).length,
                         itemBuilder: (context, index) => chatMessageTile(
-                          messages[index].message,
-                          messages[index].senderName == ref.read(userController).myUserName,
+                          ref.read(userController.notifier).getMessage(widget.chatRoomId, index).message,
+                          ref.read(userController.notifier).getMessage(widget.chatRoomId, index).senderName == ref.read(userController).myUserName,
                         ),
                       );
                     }
-                    return const Text('');
+                    return const SizedBox.shrink();
                   },
                 ),
                 Container(
@@ -86,9 +114,11 @@ class _ChatPageState extends ConsumerState<ChannelScreen> {
                             hintStyle: const TextStyle(color: Colors.black45),
                             suffixIcon: GestureDetector(
                                 onTap: () {
-                                  log('send message. hasFcm: ${snapshot.data}');
+                                  final currentRouteName = ModalRoute.of(context)?.settings.name;
+                                  log('currentRouteName: $currentRouteName');
 
                                   ref.read(userController.notifier).sendMessage(snapshot.data ?? "", messagecontroller.text);
+
                                   channel.sink.add("${ref.read(userController).myUserName}: ${messagecontroller.text}");
                                   messagecontroller.clear();
                                 },

@@ -37,6 +37,16 @@ class UserState {
 
 class UserController extends StateNotifier<UserState> {
   UserController() : super(const UserState('', '', ''));
+  Map<String, List<Message>> messages = {};
+
+  addMessage(String chatRoomId, Message message) {
+    if (messages[chatRoomId] == null) {
+      messages[chatRoomId] = [];
+    }
+    messages[chatRoomId]!.add(message);
+  }
+
+  Message getMessage(String chatRoomId, int index) => messages[chatRoomId]![index];
 
   Future<void> saveUserInfoToCloud(Map<String, dynamic> json, String uid) async {
     await FirebaseFirestore.instance.collection("users").doc(uid).set(json);
@@ -86,27 +96,27 @@ class UserController extends StateNotifier<UserState> {
     }
   }
 
-  routeChatChannel(String username, String message) => navigatorKey.currentState?.push(MaterialPageRoute(
-        builder: (context) => ChannelScreen(
-          name: username,
-          chatRoomId: getChatRoomIdbyUsername(username, state.myUserName),
-          message: message,
-        ),
-      ));
+  routeChatChannel(String username, String message) async {
+    await getOrCreateRoom(username);
+    navigatorKey.currentState?.pushNamed(
+      "/channel",
+      arguments: {
+        'name': username,
+        'chatRoomId': getChatRoomIdbyUsername(username, state.myUserName),
+        'message': message,
+      },
+    );
+  }
 
-  // static Future<void> sendNotifcation(String toToken, String name, String content) async {
-  //   final dio = Dio();
-
-  //   String localUrl = 'http://13.125.68.71:5000/sendChat';
-
-  //   FormData formData = FormData.fromMap({'fcm': toToken, 'name': name, 'content': content});
-
-  //   dio.get(
-  //     localUrl,
-  //     data: formData,
-  //     options: Options(headers: {"Content-Type": "multipart/form-data"}),
-  //   );
-  // }
+  Future<String> getOrCreateRoom(String channelUsername) async {
+    String chatRoomId = getChatRoomIdbyUsername(state.myUserName, channelUsername);
+    final snapshot = await FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).get();
+    log('snapshot: ${snapshot.exists}');
+    if (!snapshot.exists) {
+      await FirebaseFirestore.instance.collection("chatrooms").doc(chatRoomId).set({'id': chatRoomId});
+    }
+    return chatRoomId;
+  }
 }
 
 class RouteGenerator {

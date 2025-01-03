@@ -22,6 +22,19 @@ final firebaseUtils = Provider((ref) => FirebaseUtils(ref: ref));
 class FirebaseUtils {
   Ref ref;
   FirebaseUtils({required this.ref});
+
+  void getUserToken() async {
+    String? fcmToken = await FirebaseMessaging.instance.getToken();
+    final user = FirebaseAuth.instance.currentUser;
+    String? uid1 = user?.uid;
+
+    ref.read(userController.notifier).updateUserFCMtoken(uid1 ?? '', {'fcm_token': fcmToken ?? 'empty'});
+    log('my token: $fcmToken');
+
+    log("********************FIREBASE MESSAGE TOKEN******************");
+    log(fcmToken.toString());
+  }
+
   init() async {
     await Firebase.initializeApp(name: "Chat app secure", options: DefaultFirebaseOptions.currentPlatform);
     await ref.read(notificationHandler).init();
@@ -48,7 +61,6 @@ class FirebaseUtils {
       });
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        log('onMessageOpenedApp : ');
         log(message.data.toString());
 
         if (message.data['navigation'] != null) {
@@ -62,22 +74,9 @@ class FirebaseUtils {
     }
   }
 
-  void getUserToken() async {
-    String? fcmToken = await FirebaseMessaging.instance.getToken();
-    final user = FirebaseAuth.instance.currentUser;
-    String? uid1 = user?.uid;
-    log('my uid: $uid1');
-    ref.read(userController.notifier).updateUserFCMtoken(uid1 ?? '', {'fcm_token': fcmToken ?? 'empty'});
-    log('my token: $fcmToken');
-
-    log("********************FIREBASE MESSAGE TOKEN******************");
-    log(fcmToken.toString());
-  }
-
   static void onFirebaseBackgroundMsg(RemoteMessage message) async {
     RemoteNotification? notification = message.notification;
 
-    log('onFirebaseBackgroundMsg ${message.messageId}');
     log(message.data.toString());
 
     if (notification != null && !kIsWeb) {
@@ -140,7 +139,7 @@ class NotificationHandler {
 
   void onDidReceiveLocalNotification(NotificationResponse response) async {
     if (response.payload == null) return;
-    log('payload: ${response.payload}');
+
     String username = response.payload!.split(",")[0].split(":")[1].trim();
     String message = response.payload!.split(",")[1].split(":")[1].trim();
 
@@ -156,7 +155,6 @@ class NotificationHandler {
   }
 
   static void onDidReceiveBackgroundNotificationResponse(NotificationResponse response) async {
-    log('onDidReceiveBackgroundNotificationResponse');
     log(response.toString());
   }
 }
