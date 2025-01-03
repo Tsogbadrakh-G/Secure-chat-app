@@ -22,7 +22,8 @@ class ChannelScreen extends ConsumerStatefulWidget {
   ConsumerState<ChannelScreen> createState() => _ChatPageState();
 }
 
-const String hostname = "192.168.4.28";
+const String hostname = "3.107.172.186";
+//"3.107.172.186";
 
 class _ChatPageState extends ConsumerState<ChannelScreen> {
   String avatarUrl =
@@ -42,7 +43,8 @@ class _ChatPageState extends ConsumerState<ChannelScreen> {
 
   @override
   void initState() {
-    log('message: ${widget.message}');
+    ref.read(userController.notifier).isUserInChatPage = true;
+
     if (widget.message != null) {
       ref.read(userController.notifier).addMessage(
             widget.chatRoomId,
@@ -216,6 +218,7 @@ class _ChatPageState extends ConsumerState<ChannelScreen> {
 
   @override
   void dispose() {
+    ref.read(userController.notifier).isUserInChatPage = false;
     channel.sink.close();
     super.dispose();
   }

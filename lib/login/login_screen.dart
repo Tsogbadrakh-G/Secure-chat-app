@@ -31,6 +31,7 @@ class _LogInState extends ConsumerState<LogInScreen> {
   bool isValidMail = false;
   bool isValidPass = false;
   final _formkey = GlobalKey<FormState>();
+  ValueNotifier<bool> isLogging = ValueNotifier<bool>(false);
 
   validator() {
     if (usermailcontroller.text.isEmpty) {
@@ -57,6 +58,7 @@ class _LogInState extends ConsumerState<LogInScreen> {
 
   login() async {
     try {
+      isLogging.value = true;
       email = email.toLowerCase();
       await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
 
@@ -69,7 +71,7 @@ class _LogInState extends ConsumerState<LogInScreen> {
         log('room: ${room.id}');
         await FirebaseFirestore.instance.collection("chatrooms").doc(room.id).delete();
       }
-
+      isLogging.value = false;
       Navigator.push(context, MaterialPageRoute(builder: (context) => const HomeScreen()));
 
       Map<String, dynamic> userInfoMap = {
@@ -97,6 +99,7 @@ class _LogInState extends ConsumerState<LogInScreen> {
 
       log('sign in exception: ${e.toString()}, code: ${e.code}');
     }
+    isLogging.value = false;
   }
 
   @override
@@ -235,10 +238,21 @@ class _LogInState extends ConsumerState<LogInScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             backgroundColor: const Color(0xff0057ff),
                           ),
-                          child: const Text(
-                            'Sign in',
-                            style: TextStyle(color: Colors.white, fontFamily: 'Nunito', fontWeight: FontWeight.normal, fontSize: 14),
-                          ),
+                          child: ValueListenableBuilder(
+                              valueListenable: isLogging,
+                              builder: (context, val, b) {
+                                if (val) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  );
+                                }
+                                return const Text(
+                                  'Sign in',
+                                  style: TextStyle(color: Colors.white, fontFamily: 'Nunito', fontWeight: FontWeight.normal, fontSize: 14),
+                                );
+                              }),
                         ),
                       ),
                       const SizedBox(

@@ -39,6 +39,8 @@ class UserController extends StateNotifier<UserState> {
   UserController() : super(const UserState('', '', ''));
   Map<String, List<Message>> messages = {};
 
+  bool isUserInChatPage = false;
+
   addMessage(String chatRoomId, Message message) {
     if (messages[chatRoomId] == null) {
       messages[chatRoomId] = [];
@@ -98,14 +100,16 @@ class UserController extends StateNotifier<UserState> {
 
   routeChatChannel(String username, String message) async {
     await getOrCreateRoom(username);
-    navigatorKey.currentState?.pushNamed(
-      "/channel",
-      arguments: {
-        'name': username,
-        'chatRoomId': getChatRoomIdbyUsername(username, state.myUserName),
-        'message': message,
-      },
-    );
+    if (!isUserInChatPage) {
+      navigatorKey.currentState?.pushNamed(
+        "/channel",
+        arguments: {
+          'name': username,
+          'chatRoomId': getChatRoomIdbyUsername(username, state.myUserName),
+          'message': message,
+        },
+      );
+    }
   }
 
   Future<String> getOrCreateRoom(String channelUsername) async {
